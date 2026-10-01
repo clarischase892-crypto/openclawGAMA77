@@ -1,0 +1,38 @@
+# Base44 development compose for the OpenClaw Control UI.
+# Runs the Vite dev server from the cloned source so edits hot-reload.
+services:
+  ui:
+    image: node:22
+    working_dir: /app
+    volumes:
+      - ./:/app
+    ports:
+      - "3000:5173"
+    environment:
+      # Vite >= 6.1 appends this to its allowedHosts list so the preview's
+      # external hostname is accepted. The platform sets the value.
+      - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS
+      - BASE44_PUBLIC_HOST_SUFFIX
+    # Install pinned pnpm via corepack, install deps from the lockfile, then
+    # start the Vite dev server (binds 0.0.0.0:5173 via server.host:true in the
+    # vite config). --ignore-scripts skips native build scripts the browser UI
+    # does not need, keeping the install fast and reliable in the container.
+    command:
+      [
+        "sh",
+        "-ec",
+        "corepack enable && pnpm install --frozen-lockfile --ignore-scripts && exec pnpm --filter openclaw-control-ui dev",
+      ]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:5173/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 180s
+    restart: on-failure
